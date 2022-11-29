@@ -45,7 +45,6 @@ bool stringIsNotEqual(char string[MAX_LENGTH], char str[MAX_LENGTH]);
 **/
 
 int main (int argc, char *argv[]) {
-    struct Person listName[MAX_NAME];
     struct Person *list = mmap(NULL, sizeof(struct Person)*100, PROT_READ | PROT_WRITE, 
                         MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
