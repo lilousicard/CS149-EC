@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/mman.h>
 
 #define MAX_NAME 100
 #define MAX_LENGTH 30
@@ -43,17 +45,16 @@ bool stringIsNotEqual(char string[MAX_LENGTH], char str[MAX_LENGTH]);
 **/
 
 int main (int argc, char *argv[]) {
+    struct Person listName[MAX_NAME];
+    struct Person *list = mmap(NULL, sizeof(struct Person)*100, PROT_READ | PROT_WRITE, 
+                        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-    int pfds[2];
-    struct Person buf[MAX_NAME];
-    struct Person listNames[MAX_NAME];
-    pipe(pfds);
-
+    int namesSize = 0;
     //Initialized all the persons in listNames to 
     //avoid any bad surprise
     for (int i = 0; i < MAX_NAME; i++){
-        listNames[i].name[0] = '\0';
-        listNames[i].hasAName = false;
+        list[i].name[0] = '\0';
+        list[i].hasAName = false;
     }
     
     //Start the process of reading all the file
@@ -64,16 +65,8 @@ int main (int argc, char *argv[]) {
         int childID = fork();
         if (childID == 0){
             char str[MAX_LENGTH];
-            struct Person names[MAX_NAME];
-            int namesSize = 0;
-            FILE *fp;
             
-            //Initialized all the persons in names to 
-            //avoid any bad surprise
-            for (int i = 0; i < MAX_NAME; i++){
-        	names[i].name[0] = '\0';
-       	 	names[i].hasAName = false;
-       	 	}
+            FILE *fp;
 
             // opening file for reading
             fp = fopen( fileName, "r");
@@ -81,8 +74,6 @@ int main (int argc, char *argv[]) {
             // check that fp is not null, return an error otherwise
             if(fp == NULL) {
                 fprintf(stderr,"range: cannot open file %s \n",fileName);
-		//write (pfds[1],names,sizeof(buf));
-		//close (pfds[1]);
                 _Exit(2);
             }
 
@@ -104,71 +95,45 @@ int main (int argc, char *argv[]) {
                 //try to find if the name is already in the array
                 //if not, find the next empty spot
                 int index = 0;
-                while (stringIsNotEqual(names[index].name,str) && index<namesSize){
-                    //if the char of the readed line == \n, we can safely exit the loop
-                    if (str[index] == '\n') {
-                        index = namesSize-1;
-                    }
+
+
+
+
+
+                while (stringIsNotEqual(list[index].name,str) && list[index].hasAName){
                     index++;
                 }
                 //If the name is not already in the array, store it
-                if (index>=namesSize){
+                if (!list[index].hasAName){
                     int i = 0;
                     while (str[i]!='\n'){
-                        names[index].name[i]=str[i];
+                        list[index].name[i]=str[i];
                         i++;
                     }
-                    names[index].name[i]='\0';
-                    names[index].occurrence = 1;
-                    names[index].hasAName = true;
+                    list[index].name[i]='\0';
+                    list[index].occurrence = 1;
+                    list[index].hasAName = true;
                     namesSize++;
-                } else names[index].occurrence++;
+                } else list[index].occurrence++;
             }
             //End of the child process
             fclose(fp);
-            write (pfds[1],names,sizeof(buf));
-            close (pfds[1]);
             exit(0);
         }
     }
-    int pid;
+   // int pid;
+    wait(NULL);
     //PARENT PROCESS
-    while ((wait(&pid)) > 0) {
-	if (pid == 0){
-       	 read(pfds[0], buf, sizeof(buf));
-       	 //Combining the array process
-       	 int i = 0;
-       	 //for every name in the array returned by the child
-       	 while (buf[i].hasAName && i<100){
-        	  //see if the name is already in the array
-           	 int j = 0;
-           	 //Search the name
-           	 while (listNames[j].hasAName && stringIsNotEqual(listNames[j].name,buf[i].name)){
-               	 j++;
-           	 }
-           	 //If the name is already in the array, simply add the occurence
-           	 if (listNames[j].hasAName){
-               		 listNames[j].occurrence += buf[i].occurrence;
-           	 } else {
-               	 // else store the information from the child array into the parent's array
-               	 strcpy(listNames[j].name,buf[i].name);
-                listNames[j].occurrence = buf[i].occurrence;
-                listNames[j].hasAName = true;
-           	 }
-           	 i++;
-       	 }
-	}	
-        //close(pfds[0]); Strange behavior when place here
-    }
+   // while ((wait(&pid)) > 0) {
+    	
+  //  }
     //End of parent process
-    close(pfds[0]);
     int j = 0;
     //Display all the names and the occurence
-    while (listNames[j].hasAName && j<100) {
-        printf("%s : %d\n", listNames[j].name, listNames[j].occurrence);
+    while (list[j].hasAName && j<100) {
+        printf("%s : %d\n", list[j].name, list[j].occurrence);
         j++;
     }
-   // close(pfds[0]);
     return(0);
 }
 
